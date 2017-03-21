@@ -17,10 +17,10 @@ echo 'export PATH=$JAVA_HOME/bin:$PATH' >> /home/vagrant/.bashrc
 
 # Set up Titan
 pushd /usr/local
-sudo wget http://s3.thinkaurelius.com/downloads/titan/titan-1.0.0-hadoop2.zip -O titan-1.0.0-hadoop2.zip
-sudo unzip titan-1.0.0-hadoop2.zip
-sudo mv titan-1.0.0-hadoop2 titan
-sudo rm titan-1.0.0-hadoop2.zip
+sudo wget http://s3.thinkaurelius.com/downloads/titan/titan-1.0.0-hadoop1.zip -O titan-1.0.0-hadoop1.zip
+sudo unzip titan-1.0.0-hadoop1.zip
+sudo mv titan-1.0.0-hadoop1 titan
+sudo rm titan-1.0.0-hadoop1.zip
 sudo mkdir titan/db
 sudo chmod a+w titan/db
 sudo chmod a+w titan/ext
