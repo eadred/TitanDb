@@ -24,6 +24,8 @@ sudo rm titan-1.0.0-hadoop2.zip
 sudo mkdir titan/db
 sudo chmod a+w titan/db
 sudo chmod a+w titan/ext
+sudo chmod a+w titan/log
+sudo chmod a+w titan/log/*
 export PATH=/usr/local/titan/bin:$PATH
 echo 'export PATH=/usr/local/titan/bin:$PATH' >> /home/vagrant/.bashrc
 popd
