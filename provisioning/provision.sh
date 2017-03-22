@@ -17,15 +17,27 @@ echo 'export PATH=$JAVA_HOME/bin:$PATH' >> /home/vagrant/.bashrc
 
 # Set up Titan
 pushd /usr/local
+
+# Download package
 sudo wget http://s3.thinkaurelius.com/downloads/titan/titan-1.0.0-hadoop1.zip -O titan-1.0.0-hadoop1.zip
 sudo unzip titan-1.0.0-hadoop1.zip
 sudo mv titan-1.0.0-hadoop1 titan
 sudo rm titan-1.0.0-hadoop1.zip
+
+# Set up permissions
 sudo mkdir titan/db
 sudo chmod a+w titan/db
 sudo chmod a+w titan/ext
 sudo chmod a+w titan/log
 sudo chmod a+w titan/log/*
+
+# Bind the server port to all network adapters so we can reach it from the host
+sudo sed "s/host: .*/host: 0.0.0.0/" -i titan/conf/gremlin-server/gremlin-server.yaml
+# Use basic REST rather than websockets - note that the Gremlin console doesn't appear to have a setting for this, at least not with Tinkerpop 3.0.1
+# that Titan Db uses
+#sudo sed 's/channelizer: .*/channelizer: org.apache.tinkerpop.gremlin.server.channel.HttpChannelizer/' -i titan/conf/gremlin-server/gremlin-server.yaml
+
+# Modify path
 export PATH=/usr/local/titan/bin:$PATH
 echo 'export PATH=/usr/local/titan/bin:$PATH' >> /home/vagrant/.bashrc
 popd
