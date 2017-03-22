@@ -14,15 +14,15 @@ object Main {
     val config = new PropertiesConfiguration("gremlinclient.properties")
 
     val cluster = Cluster.open(config)
-
     val client = cluster.connect[Client]()
 
-    val result = client.submit("100-90");
+    val result = client.submit("g.V().values('name')");
 
     System.out.println("Processing results...")
-    result.stream().forEach(r => System.out.println(s"Result was ${r.getInt}"))
+    result.stream().forEach(r => System.out.println(s"Result was '${r.getString}'"))
     System.out.println("Done!")
 
     client.close()
+    cluster.close()
   }
 }
