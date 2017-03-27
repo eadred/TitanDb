@@ -1,5 +1,5 @@
 import gremlin.scala._
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.{TinkerFactory, TinkerGraph}
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.{TinkerFactory, TinkerGraph, TinkerProperty}
 
 import scala.collection.JavaConverters._
 import org.apache.tinkerpop.gremlin.driver.{Client, Cluster}
@@ -39,5 +39,27 @@ object Main {
 
     traversalSource.close()
     cluster.close()
+  }
+
+  def tryOutElementProperties = {
+    val g = TinkerGraph.open.asScala
+    val v1 = g.addVertex("V1", ("name", "fred"), ("age", 97))
+    val v2 = g.addVertex("V2", ("name", "daisy"), ("age", 82))
+    val e = v1.addEdge("V1-V2", v2, "foo", 6.asInstanceOf[AnyRef], "bar", true.asInstanceOf[AnyRef])
+
+    def getKeyVals(el:Element) = {
+      el
+        .keys
+        .asScala
+        .map(k => {
+          val prop:Property[TinkerProperty[AnyRef]] = el.property(k)
+          (prop.key, prop.value)
+        })
+        .toList
+    }
+
+    val edgeKeyVals = getKeyVals(e)
+    val v1KeyVals = getKeyVals(v1)
+    val v2KeyVals = getKeyVals(v2)
   }
 }
