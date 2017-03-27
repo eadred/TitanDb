@@ -1,10 +1,11 @@
-import gremlin.scala._
+
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.{TinkerFactory, TinkerGraph, TinkerProperty}
 
 import scala.collection.JavaConverters._
 import org.apache.tinkerpop.gremlin.driver.{Client, Cluster}
 import org.apache.commons.configuration.PropertiesConfiguration
 import org.apache.tinkerpop.gremlin.driver.remote.DriverRemoteConnection
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 
 
@@ -12,7 +13,15 @@ import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
   * Created by eabi on 21/03/2017.
   */
 object Main {
+
+  import gremlin.scala._
+
+  //Required in `match`
+  import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
+
   def main(args:Array[String]) = {
+    tryOutElementProperties
+
     val config = new PropertiesConfiguration("gremlinclient.properties")
 
     val cluster = Cluster.open(config)
@@ -41,11 +50,51 @@ object Main {
     cluster.close()
   }
 
+
+
   def tryOutElementProperties = {
     val g = TinkerGraph.open.asScala
-    val v1 = g.addVertex("V1", ("name", "fred"), ("age", 97))
-    val v2 = g.addVertex("V2", ("name", "daisy"), ("age", 82))
-    val e = v1.addEdge("V1-V2", v2, "foo", 6.asInstanceOf[AnyRef], "bar", true.asInstanceOf[AnyRef])
+
+    val p1 = g.addVertex("Person", ("name", "fred"), ("age", 97))
+    val p2 = g.addVertex("Person", ("name", "daisy"), ("age", 82))
+    val food1 = g.addVertex("Food", ("name", "Rice Pudding"))
+    val food2 = g.addVertex("Food", ("name", "Boiled Onion"))
+    val e = p1.addEdge("Knows", p2, "foo", 6.asInstanceOf[AnyRef], "bar", true.asInstanceOf[AnyRef])
+    p1.addEdge("Eats", food1)
+    p2.addEdge("Eats", food2)
+
+    implicit def toKey[A](keyName: String):Key[A] = Key(keyName)
+
+    val fred = g.V.has("name"->"fred").toList()
+
+    //Or alternatively, relying on the implicit conversion...
+    //implicit def toTraversal(g:GremlinScala[_,_]) = g.traversal
+    //val fred2 = g.V.has("name", "fred")
+
+    val totAge = g.V.hasLabel("Person")
+      .foldLeft(0)((tot,v) => tot + v.value[Int]("age"))
+      .traversal
+      .next()
+
+    val matchResult = g.V.`match`(
+      __.as("knower").out("Knows").as("knowee"),
+      __.as("knowee").has("name", "daisy")
+    )
+      .select("knower", "knowee")
+      .by("name")
+      .toList
+
+    val paths = g.V.outE.inV.path().by("name").by().toList  //How can we do by(label)?
+
+    val nodes = g.V.repeat(v => v.both())
+      .times(5)
+      .values("name")
+      .toList
+
+    val eatsGraph = g.E.hasLabel("Eats")
+      .subgraph(StepLabel("eatsGraph")).cap("eatsGraph").traversal
+      .next().asInstanceOf[TinkerGraph] //Note - need the cast otherwise the type checker still thinks we are expecting an Edge
+      .asScala
 
     def getKeyVals(el:Element) = {
       el
@@ -59,7 +108,7 @@ object Main {
     }
 
     val edgeKeyVals = getKeyVals(e)
-    val v1KeyVals = getKeyVals(v1)
-    val v2KeyVals = getKeyVals(v2)
+    val v1KeyVals = getKeyVals(p1)
+    val v2KeyVals = getKeyVals(p2)
   }
 }
