@@ -1,12 +1,12 @@
-
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.{TinkerEdge, TinkerFactory, TinkerGraph, TinkerProperty}
 
 import scala.collection.JavaConverters._
 import org.apache.tinkerpop.gremlin.driver.{Client, Cluster}
 import org.apache.commons.configuration.PropertiesConfiguration
 import org.apache.tinkerpop.gremlin.driver.remote.DriverRemoteConnection
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
+import shapeless.{HList, HNil}
 
 
 /**
@@ -51,6 +51,26 @@ object Main {
     cluster.close()
   }
 
+  implicit class ScalaGraphExtra(g:ScalaGraph) {
+    def withSack[A](initialValue:A):GraphTraversalSource = {
+      //Have to return the GraphTraversalSource rather than its graph since
+      //the graph knows nothing about this traversal source and instead will create
+      //a new one when it's traversal is requested (eg when asking for the vertices)
+      g.graph.traversal.withSack(initialValue)
+    }
+  }
+
+  implicit class GraphTraversalSourceExtra(gts:GraphTraversalSource) {
+    def Vertices = GremlinScala[Vertex, HNil](gts.V())
+    def Vertices(vertexIds:AnyRef*) = GremlinScala[Vertex, HNil](gts.V(vertexIds))
+    def Edges = GremlinScala[Edge, HNil](gts.E())
+    def Edges(edgeIds:AnyRef*) = GremlinScala[Edge, HNil](gts.E(edgeIds))
+  }
+
+  implicit class GremlinScalaExtra[End, Labels <: HList](gs:GremlinScala[End,Labels]) {
+    def updateSack[V,U](fn: (V,U) => V):GremlinScala[End, Labels] = GremlinScala[End, Labels](gs.traversal.sack((x,y) => fn(x,y)))
+  }
+
   implicit def toKey[A](keyName: String):Key[A] = Key(keyName)
 
   def tryOutSubgraph = {
@@ -72,16 +92,30 @@ object Main {
     per3.addEdge("WorkedOn", proj2)
     per4.addEdge("WorkedOn", proj3)
 
+    // Find all people connected to Project B
+    val pathsAndWeightsTraversal = g.withSack(1.0).Vertices.hasLabel("Person").as("person") //Start at all people
+      .repeat(v =>
+        v.bothE().hasLabel("WorkedOn","DependsOn") //Find all simple paths through WorkedOn and DependsOn relations...
+        .updateSack[Double,TinkerEdge]((x,_) => x * 0.5) //...where for every edge we encounter attenuate the sack (people further away are less important) - potentially could use the edge type to determine the amount of attenuation
+        .bothV().simplePath())
+      .until(v => v.has("name"->"Project B")).as("project") //Only consider paths that end up at Project B
+      .path.as("path") //Get hold of these paths
+      .select("project").sack[Double]().as("sack") //Back up and get hold of the sack value for each path too
+      .select("person", "path", "sack")
+
+    //List of maps, with each map containing the person node, the path and the sack value
+    val pathsAndWeights = pathsAndWeightsTraversal.traversal.toList
+
     //Find the sub-graph consisting of all people connected to Project B
-    val proj2SubGraph = g.V.hasLabel("Person") //Start at all people
+    val pathsToProj2 = g.V.hasLabel("Person") //Start at all people
       .repeat(v => v.bothE().hasLabel("WorkedOn","DependsOn").bothV().simplePath()) //Find all simple paths through WorkedOn and DependsOn relations...
       .until(v => v.has("name"->"Project B")) //...but only those that end up at Project B
-      .path().unfold() //Get all steps (vertices and edges) of all these paths...
+      .path()
+
+    val proj2SubGraph = pathsToProj2.unfold() //Get all steps (vertices and edges) of all these paths...
       .filter((a:AnyRef) => a.isInstanceOf[TinkerEdge]).map((a:AnyRef) => a.asInstanceOf[TinkerEdge]) //...and filter to just the edges
       .subgraph(StepLabel("subgraph")).cap("subgraph") //Create sub-graph based on these edges
       .traversal.next().asInstanceOf[TinkerGraph].asScala
-
-    val q = 0;
   }
 
 
@@ -95,8 +129,6 @@ object Main {
     val e = p1.addEdge("Knows", p2, "foo", 6.asInstanceOf[AnyRef], "bar", true.asInstanceOf[AnyRef])
     p1.addEdge("Eats", food1)
     p2.addEdge("Eats", food2)
-
-
 
     val fred = g.V.has("name"->"fred").toList()
 
