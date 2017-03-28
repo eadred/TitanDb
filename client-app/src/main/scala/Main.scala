@@ -1,5 +1,5 @@
 
-import org.apache.tinkerpop.gremlin.tinkergraph.structure.{TinkerFactory, TinkerGraph, TinkerProperty}
+import org.apache.tinkerpop.gremlin.tinkergraph.structure.{TinkerEdge, TinkerFactory, TinkerGraph, TinkerProperty}
 
 import scala.collection.JavaConverters._
 import org.apache.tinkerpop.gremlin.driver.{Client, Cluster}
@@ -20,6 +20,7 @@ object Main {
   import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 
   def main(args:Array[String]) = {
+    tryOutSubgraph
     tryOutElementProperties
 
     val config = new PropertiesConfiguration("gremlinclient.properties")
@@ -50,6 +51,38 @@ object Main {
     cluster.close()
   }
 
+  implicit def toKey[A](keyName: String):Key[A] = Key(keyName)
+
+  def tryOutSubgraph = {
+    val g = TinkerGraph.open.asScala
+
+    val proj1 = g.addVertex("Project", ("name", "Project A"))
+    val proj2 = g.addVertex("Project", ("name", "Project B"))
+    val proj3 = g.addVertex("Project", ("name", "Project C"))
+
+    val per1 = g.addVertex("Person", ("name", "Alice"))
+    val per2 = g.addVertex("Person", ("name", "Bob"))
+    val per3 = g.addVertex("Person", ("name", "Charlie"))
+    val per4 = g.addVertex("Person", ("name", "Daisy"))
+
+    proj2.addEdge("DependsOn", proj3)
+
+    per1.addEdge("WorkedOn", proj1)
+    per2.addEdge("WorkedOn", proj2)
+    per3.addEdge("WorkedOn", proj2)
+    per4.addEdge("WorkedOn", proj3)
+
+    //Find the sub-graph consisting of all people connected to Project B
+    val proj2SubGraph = g.V.hasLabel("Person") //Start at all people
+      .repeat(v => v.bothE().hasLabel("WorkedOn","DependsOn").bothV().simplePath()) //Find all simple paths through WorkedOn and DependsOn relations...
+      .until(v => v.has("name"->"Project B")) //...but only those that end up at Project B
+      .path().unfold() //Get all steps (vertices and edges) of all these paths...
+      .filter((a:AnyRef) => a.isInstanceOf[TinkerEdge]).map((a:AnyRef) => a.asInstanceOf[TinkerEdge]) //...and filter to just the edges
+      .subgraph(StepLabel("subgraph")).cap("subgraph") //Create sub-graph based on these edges
+      .traversal.next().asInstanceOf[TinkerGraph].asScala
+
+    val q = 0;
+  }
 
 
   def tryOutElementProperties = {
@@ -63,7 +96,7 @@ object Main {
     p1.addEdge("Eats", food1)
     p2.addEdge("Eats", food2)
 
-    implicit def toKey[A](keyName: String):Key[A] = Key(keyName)
+
 
     val fred = g.V.has("name"->"fred").toList()
 
@@ -84,7 +117,7 @@ object Main {
       .by("name")
       .toList
 
-    val paths = g.V.outE.inV.path().by("name").by().toList  //How can we do by(label)?
+    val paths = g.V.outE.inV.path().by("name").by().toList  //How can we do by (label)?
 
     val nodes = g.V.repeat(v => v.both())
       .times(5)
