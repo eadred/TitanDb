@@ -4,11 +4,14 @@ SCRIPTDIR=$(dirname $0)
 
 echo "Running provisioning script"
 
+echo "deb http://www.apache.org/dist/cassandra/debian 310x main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list
+curl https://www.apache.org/dist/cassandra/KEYS | sudo apt-key add -
 sudo add-apt-repository -y ppa:openjdk-r/ppa
 sudo apt-get update
 sudo apt-get install unzip
 sudo apt-get install -y openjdk-8-jdk
 sudo apt-get install -y openjfx
+sudo apt-get install -y cassandra
 
 # Set up Java
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
